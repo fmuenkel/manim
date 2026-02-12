@@ -5,12 +5,18 @@ from __future__ import annotations
 __all__ = ["MappingCamera", "OldMultiCamera", "SplitScreenCamera"]
 
 import math
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
+import numpy.typing as npt
+
+from manim.typing import ManimInt, PixelArray, Point3D, Point3D_Array
 
 from ..camera.camera import Camera
+from ..mobject.mobject import Mobject
 from ..mobject.types.vectorized_mobject import VMobject
-from ..utils.config_ops import DictAsObject
 
 # TODO: Add an attribute to mobjects under which they can specify that they should just
 # map their centers but remain otherwise undistorted (useful for labels, etc.)
@@ -31,24 +37,26 @@ class MappingCamera(Camera):
 
     def __init__(
         self,
-        mapping_func=lambda p: p,
-        min_num_curves=50,
-        allow_object_intrusion=False,
-        **kwargs,
+        mapping_func: Callable[[Point3D], Point3D] = lambda p: p,
+        min_num_curves: int = 50,
+        allow_object_intrusion: bool = False,
+        **kwargs: Any,
     ):
         self.mapping_func = mapping_func
         self.min_num_curves = min_num_curves
         self.allow_object_intrusion = allow_object_intrusion
         super().__init__(**kwargs)
 
-    def points_to_pixel_coords(self, mobject, points):
+    def points_to_pixel_coords(
+        self, mobject: Mobject, points: Point3D_Array
+    ) -> npt.NDArray[ManimInt]:
         # Map points with custom function before converting to pixels
         return super().points_to_pixel_coords(
             mobject,
             np.apply_along_axis(self.mapping_func, 1, points),
         )
 
-    def capture_mobjects(self, mobjects, **kwargs):
+    def capture_mobjects(self, mobjects: Iterable[Mobject], **kwargs: Any) -> None:
         """Capture mobjects for rendering after applying the spatial mapping.
 
         Copies mobjects unless intrusion is allowed, and ensures
@@ -79,6 +87,18 @@ class MappingCamera(Camera):
 # CameraPlusOverlay class)
 
 
+@dataclass
+class ShiftedCamera:
+    camera: Camera
+    start_x: int
+    start_y: int
+    end_x: int
+    end_y: int
+
+    def __repr__(self) -> str:
+        return f"ShiftedCamera(camera={self.camera}, start_x={self.start_x}, start_y={self.start_y}, end_x={self.end_x}, end_y={self.end_y})"
+
+
 # TODO, the classes below should likely be deleted
 class OldMultiCamera(Camera):
     """Parameters
@@ -88,24 +108,26 @@ class OldMultiCamera(Camera):
         its pixel offset on the final frame.
     """
 
-    def __init__(self, *cameras_with_start_positions, **kwargs):
+    def __init__(
+        self,
+        *cameras_with_start_positions: tuple[Camera, tuple[int, int]],
+        **kwargs: Any,
+    ):
         self.shifted_cameras = [
-            DictAsObject(
-                {
-                    "camera": camera_with_start_positions[0],
-                    "start_x": camera_with_start_positions[1][1],
-                    "start_y": camera_with_start_positions[1][0],
-                    "end_x": camera_with_start_positions[1][1]
-                    + camera_with_start_positions[0].pixel_width,
-                    "end_y": camera_with_start_positions[1][0]
-                    + camera_with_start_positions[0].pixel_height,
-                },
+            ShiftedCamera(
+                camera=camera_with_start_positions[0],
+                start_x=camera_with_start_positions[1][1],
+                start_y=camera_with_start_positions[1][0],
+                end_x=camera_with_start_positions[1][1]
+                + camera_with_start_positions[0].pixel_width,
+                end_y=camera_with_start_positions[1][0]
+                + camera_with_start_positions[0].pixel_height,
             )
             for camera_with_start_positions in cameras_with_start_positions
         ]
         super().__init__(**kwargs)
 
-    def capture_mobjects(self, mobjects, **kwargs):
+    def capture_mobjects(self, mobjects: Iterable[Mobject], **kwargs: Any) -> None:
         for shifted_camera in self.shifted_cameras:
             shifted_camera.camera.capture_mobjects(mobjects, **kwargs)
 
@@ -114,17 +136,28 @@ class OldMultiCamera(Camera):
                 shifted_camera.start_x : shifted_camera.end_x,
             ] = shifted_camera.camera.pixel_array
 
-    def set_background(self, pixel_array, **kwargs):
+    def set_background(
+        self,
+        pixel_array: PixelArray | list | tuple,
+        convert_from_floats: bool = False,
+        **kwargs: Any,
+    ) -> None:
         for shifted_camera in self.shifted_cameras:
             shifted_camera.camera.set_background(
                 pixel_array[
                     shifted_camera.start_y : shifted_camera.end_y,
                     shifted_camera.start_x : shifted_camera.end_x,
                 ],
+                convert_from_floats,
                 **kwargs,
             )
 
-    def set_pixel_array(self, pixel_array, **kwargs):
+    def set_pixel_array(
+        self,
+        pixel_array: PixelArray | list | tuple,
+        convert_from_floats: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().set_pixel_array(pixel_array, **kwargs)
         for shifted_camera in self.shifted_cameras:
             shifted_camera.camera.set_pixel_array(
@@ -132,10 +165,11 @@ class OldMultiCamera(Camera):
                     shifted_camera.start_y : shifted_camera.end_y,
                     shifted_camera.start_x : shifted_camera.end_x,
                 ],
+                convert_from_floats,
                 **kwargs,
             )
 
-    def init_background(self):
+    def init_background(self) -> None:
         super().init_background()
         for shifted_camera in self.shifted_cameras:
             shifted_camera.camera.init_background()
@@ -155,7 +189,9 @@ class SplitScreenCamera(OldMultiCamera):
     kwargs : dict
     """
 
-    def __init__(self, left_camera, right_camera, **kwargs):
+    def __init__(
+        self, left_camera: Camera, right_camera: Camera, **kwargs: Any
+    ) -> None:
         Camera.__init__(self, **kwargs)  # to set attributes such as pixel_width
         self.left_camera = left_camera
         self.right_camera = right_camera

@@ -5,7 +5,6 @@ from __future__ import annotations
 __all__ = [
     "merge_dicts_recursively",
     "update_dict_recursively",
-    "DictAsObject",
 ]
 
 
@@ -41,15 +40,6 @@ def update_dict_recursively(
 ) -> None:
     updated_dict = merge_dicts_recursively(current_dict, *others)
     current_dict.update(updated_dict)
-
-
-# Occasionally convenient in order to write dict.x instead of more laborious
-# (and less in keeping with all other attr accesses) dict["x"]
-
-
-class DictAsObject:
-    def __init__(self, dictin: dict[str, Any]):
-        self.__dict__ = dictin
 
 
 _Data_T = TypeVar("_Data_T", bound="npt.NDArray[Any]", default="npt.NDArray[Any]")
