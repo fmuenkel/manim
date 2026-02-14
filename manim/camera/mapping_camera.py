@@ -143,11 +143,21 @@ class OldMultiCamera(Camera):
         **kwargs: Any,
     ) -> None:
         for shifted_camera in self.shifted_cameras:
-            shifted_camera.camera.set_background(
-                pixel_array[
+            if isinstance(pixel_array, np.ndarray):
+                patch = pixel_array[
                     shifted_camera.start_y : shifted_camera.end_y,
                     shifted_camera.start_x : shifted_camera.end_x,
-                ],
+                ]
+            elif isinstance(pixel_array, (list, tuple)):
+                patch = [
+                    row[shifted_camera.start_x : shifted_camera.end_x]
+                    for row in pixel_array[
+                        shifted_camera.start_y : shifted_camera.end_y
+                    ]
+                ]
+
+            shifted_camera.camera.set_background(
+                patch,
                 convert_from_floats,
                 **kwargs,
             )
@@ -160,11 +170,20 @@ class OldMultiCamera(Camera):
     ) -> None:
         super().set_pixel_array(pixel_array, **kwargs)
         for shifted_camera in self.shifted_cameras:
-            shifted_camera.camera.set_pixel_array(
-                pixel_array[
+            if isinstance(pixel_array, np.ndarray):
+                patch = pixel_array[
                     shifted_camera.start_y : shifted_camera.end_y,
                     shifted_camera.start_x : shifted_camera.end_x,
-                ],
+                ]
+            elif isinstance(pixel_array, (list, tuple)):
+                patch = [
+                    row[shifted_camera.start_x : shifted_camera.end_x]
+                    for row in pixel_array[
+                        shifted_camera.start_y : shifted_camera.end_y
+                    ]
+                ]
+            shifted_camera.camera.set_pixel_array(
+                patch,
                 convert_from_floats,
                 **kwargs,
             )
